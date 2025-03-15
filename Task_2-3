@@ -490,23 +490,33 @@ void LogicalFactor(Tree*& R) {
 }
 
 void LogicalExpression(Tree*& R) {
-if (Scansymbol == '|') {
-        NEXTSYMBOL(); 
+    LogicalFactor(R);
+
+    bool orOperator = false; // Флаг для логического ИЛИ
+    if (Scansymbol == '|') {
+        NEXTSYMBOL();
         if (Scansymbol != '|') { // Проверяем, что второй символ тоже |
             cout << "ОШИБКА: Ожидался оператор '||'" << endl;
             exit(1);
         }
+        orOperator = true;
+    }
 
+    if (orOperator) {
         NEXTSYMBOL(); // Переходим к следующему символу после ||
 
         Tree* tmp = new Tree; // Новый узел
-        tmp->Inf = '|'; 
-        tmp->Left = R; 
+        tmp->Inf = '|';
+        tmp->Left = R;
 
+        bool closingPart = false; // Флаг для проверки на скобку
         if (Scansymbol == ')') {
+            closingPart = true; // Если встретили скобку
+        }
+
+        if (closingPart) {
             tmp->Right = nullptr; // Если скобка, то правого потомка нет
-            R = tmp;
-            NEXTSYMBOL(); // Переходим к следующему символу
+            R = tmp; // Обновляем корень дерева
             return;
         }
 
