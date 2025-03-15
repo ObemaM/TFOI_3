@@ -1,0 +1,567 @@
+#include <iostream>
+#include <string>
+
+using namespace std;
+
+struct Tree {
+    char Inf; // Операция или операнд, всегда один символ
+    Tree* Left;
+    Tree* Right; // Первый и второй операнды
+};
+
+Tree* R = nullptr;
+string ExprStr; // Исходная строка
+int SN = 0; // Движение по строке
+char Scansymbol; // Текущий символ
+
+void InsNode(Tree*& R, char C) { // Создание вершины в дереве
+    R = new Tree;
+    R->Inf = C;
+    R->Left = R->Right = nullptr;
+}
+
+void WriteExpr(Tree* R) { // Вывод обратной польской записи
+    if (R) { // Отдельная обработка переменных и чисел, чтобы их можно было вывести
+        if (R->Inf == 'V') { // Вывод переменной
+            cout << " ";
+
+            string variableFull; // Для хранения полной переменной (например, x1 или y4)
+            Tree* current = R->Left;
+
+            while (current) {
+                variableFull += current->Inf; // Добавляем символ из текущего узла к переменной
+                current = current->Right; // Переходим на следующий
+            }
+            cout << variableFull; // Выводим полное имя
+
+            cout << " "; // Аналогично и для чисел ниже
+            return;
+        }
+
+        if (R->Inf == 'N') { // Вывод числа
+            cout << " ";
+
+            string number;
+            Tree* current = R->Left;
+
+            while (current) {
+                number += current->Inf;
+                current = current->Right;
+            }
+            cout << number;
+
+            cout << " ";
+            return;
+        }
+
+        WriteExpr(R->Left); // Обход деревьев
+        WriteExpr(R->Right);
+        if (R->Inf == 'A') cout << " abs "; // Вывод операторов с длиной в 2 и более символа при помощи ключевых символов для них
+        else if (R->Inf == 'F') cout << " fact "; // Факториал
+        else if (R->Inf == '|') cout << " || "; // Или
+        else if (R->Inf == 'E') cout << " == ";
+        else if (R->Inf == 'U') cout << " <> ";
+        else if (R->Inf == 'L') cout << " <= ";
+        else if (R->Inf == 'G') cout << " >= ";
+        else if (R->Inf == 'D') cout << " // "; // Целочисленное деление
+        else cout << ' ' << R->Inf << ' ';
+    }
+}
+
+void NEXTSYMBOL() { // Переход к следующему символу и обновление ScanSymbol
+    if (SN < ExprStr.length() - 1) {
+        SN++; // Переходим на след символ
+        Scansymbol = ExprStr[SN]; // Обновление текущего символа 
+    }
+    else {
+        SN = -1; // Флаг конца строки 
+    }
+}
+
+void LogicalExpression(Tree*& R);
+void Comparison(Tree*& R);
+void Addend(Tree*& R);
+void Division(Tree*& R);
+void Power(Tree*& R);
+void Factor(Tree*& R);
+
+void Factor(Tree*& R) { // Обработка элементов выражения
+    if (Scansymbol == '!') { // Логическое НЕ
+        NEXTSYMBOL();
+
+        Tree* tmp = new Tree;
+        tmp->Inf = '!'; // Создаем узел для НЕ 
+        tmp->Left = nullptr; // Левого потомка не существует 
+
+        Factor(tmp->Right);
+        R = tmp; // Устанавливаем как текущий корень
+        return;
+    }
+    if (Scansymbol == '(') { // Работа со скобками
+        NEXTSYMBOL(); // Следующий символ
+        LogicalExpression(R); // Выражение в скобках
+
+        if (Scansymbol != ')') { // Наличие закрывающей скобки 
+            cout << "ОШИБКА: Отсутствует закрывающая скобка" << endl;
+            exit(1);
+        }
+
+        NEXTSYMBOL(); // На следующий символ
+        return;
+    }
+    if (islower(Scansymbol) || isalpha(Scansymbol)) { // Обработка переменных и функций fact и abs
+        char firstChar = Scansymbol; // Сохраняем первый символ
+        NEXTSYMBOL();
+
+        string variableFull; // Создаем строку с первым символом
+        variableFull = firstChar;
+
+        if (isdigit(Scansymbol)) { // Добавление цифры к переменной, если она есть
+            variableFull += Scansymbol;
+            NEXTSYMBOL();
+        }
+        if (firstChar == 'a') { // Проверка функции abs()
+            if (Scansymbol == 'b') {
+                NEXTSYMBOL();
+                if (Scansymbol == 's') { // Просто проходим по строке в поиске ABS
+                    NEXTSYMBOL();
+                    if (Scansymbol != '(') { // Аргумент должен быть в скобках
+                        cout << "ОШИБКА: Ожидалась '('" << endl;
+                        exit(1);
+                    }
+
+                    NEXTSYMBOL();
+                    Tree* arg; // Переменная для хранения аргумента функций abs и fact
+                    LogicalExpression(arg); // Парсим аргумент
+
+                    if (Scansymbol != ')') {
+                        cout << "ОШИБКА: Ожидалась ')'" << endl;
+                        exit(1);
+                    }
+
+                    NEXTSYMBOL();
+                    InsNode(R, 'A'); // Новая вершина с ключевым символом A
+                    R->Right = arg; // Аргумент как правый потомок
+                    return;
+                }
+                else { // Чтобы не было некорректного вывода при вводе ab
+                    cout << "ОШИБКА: Непредвиденные символы в конце выражения" << endl;
+                    exit(1);
+                }
+            } // Схожим образом для факториала
+        }
+        else if (firstChar == 'f') { // Проверка функции fact()
+            if (Scansymbol == 'a') {
+                NEXTSYMBOL();
+                if (Scansymbol == 'c') {
+                    NEXTSYMBOL();
+                    if (Scansymbol == 't') {
+                        NEXTSYMBOL();
+                        if (Scansymbol != '(') {
+                            cout << "ОШИБКА: Ожидалась '('" << endl;
+                            exit(1);
+                        }
+                        NEXTSYMBOL();
+                        Tree* arg;
+                        LogicalExpression(arg);
+                        if (Scansymbol != ')') {
+                            cout << "ОШИБКА: Ожидалась ')'" << endl;
+                            exit(1);
+                        }
+                        NEXTSYMBOL();
+                        InsNode(R, 'F');
+                        R->Right = arg;
+                        return;
+                    } 
+                    else { // От некорректного вывода при fac
+                        cout << "ОШИБКА: Непредвиденные символы в конце выражения" << endl;
+                        exit(1);
+                    }
+                }
+                else { // От некорректного вывода при fa
+                    cout << "ОШИБКА: Непредвиденные символы в конце выражения" << endl;
+                    exit(1);
+                }
+            }
+        }
+        InsNode(R, 'V'); // Обработка переменной (с цифрой или без) - ключевой символ V
+        Tree* current = nullptr; // Указатель на текущий узел в цепочке узлов
+
+        bool isFirstSymbol = true; // Флаг для отслеживания первого символа переменной
+
+        for (char v: variableFull) { // Проход по строке, каждый символ будет узлом в дереве
+            Tree* newNode = new Tree; // Новый узел для символов
+
+            newNode->Inf = v; // Поле заполняется текущим символом
+            newNode->Left = nullptr;
+            newNode->Right = nullptr; // Изначально у узла нет потомков
+
+            if (isFirstSymbol) {
+                R->Left = newNode; // Если это первый символ, присоединяем его слева
+                current = newNode; // Обновляем указатель на текущий узел
+                isFirstSymbol = false; // После обработки первого символа меняем флаг
+            }
+            else {
+                current->Right = newNode; // Если символ не первый, присоединяем его справ
+                current = newNode; // Переход к новому узлу
+            }
+        }
+        return;
+    }
+    if (Scansymbol == '+' || Scansymbol == '-' || isdigit(Scansymbol) || Scansymbol == '.') { // Обработка чисел
+        bool hasSign = (Scansymbol == '+' || Scansymbol == '-'); // Проверка на наличие унарного знака
+
+        char sign; // Переменная для знака
+        if (hasSign) {
+            sign = Scansymbol; // Если знак, то сохраняем его
+        }
+        else {
+            sign = '+'; // Если нет знака, то число автоматом становится положительным
+        }
+
+        if (hasSign) { // Переходим на следующий символ, если нашли унарный знак
+            NEXTSYMBOL();
+
+            if (SN == -1 || (!isdigit(Scansymbol) && Scansymbol != '.')) { // Проверяем, что после него идет либо точка (для случаев по типу-.9097), либо число
+                cout << "ОШИБКА: Неверный формат числа с унарным знаком" << endl;
+                exit(1);
+            }
+        }
+        bool hasPoint = false; // Флаг для обработки вещественных чисел
+        string number; // Строка для сборки числа
+        if (hasSign) {
+            number += sign; // Если есть знак, то добавляем его к числу
+        }
+        if (Scansymbol == '.') { // Обработка числа, которое начинается с точки
+            number += '0'; // Добавляем ноль перед точкой
+            number += '.';
+            hasPoint = true; // Флаг на наличие точки 
+
+            NEXTSYMBOL();
+            if (SN == -1 || !isdigit(Scansymbol)) { // Проверяем, что после точки идет хотя бы одна цифра
+                cout << "ОШИБКА: Неверный формат вещественного числа" << endl;
+                exit(1);
+            }
+            while (isdigit(Scansymbol)) { // Собираем все цифры после точки в строку number
+                number += Scansymbol;
+                NEXTSYMBOL();
+                if (SN == -1) break; // Остановка, если дошли до конца строки 
+            }
+        }
+        else {
+            if (Scansymbol == '0') { // Обработка числа, начинающегося с 0
+                number += '0';
+                NEXTSYMBOL();
+
+                if (SN != -1 && isdigit(Scansymbol)) { // Проверяем, что после 0 не идут другие цифры
+                    cout << "ОШИБКА: Ведущий ноль в числе" << endl;
+                    exit(1);
+                }
+            }
+
+            else if (isdigit(Scansymbol)) { // Обработка целого числа, которое начсинается не с 0
+                while (isdigit(Scansymbol)) {
+                    number += Scansymbol;
+                    NEXTSYMBOL();
+                    if (SN == -1) break; // Остановка, если дошли до конца строки 
+                }
+            }
+            else {
+                cout << "ОШИБКА: Ожидалась цифра после знака" << endl;
+                exit(1);
+            }
+            if (SN != -1 && Scansymbol == '.') { // Обработка дробной части после точки 
+                number += '.';
+                NEXTSYMBOL();
+                if (SN == -1 || !isdigit(Scansymbol)) { // Проверяем, что после точки идет хотя бы одна цифра
+                    cout << "ОШИБКА: Отсутствие дробной части в вещественном числе" << endl;
+                    exit(1);
+                }
+                while (isdigit(Scansymbol)) { // Считываем все цифры после точки
+                    number += Scansymbol;
+                    NEXTSYMBOL();
+                    if (SN == -1) break; // Остановка, если достигли конца строки 
+                }
+            }
+        }
+
+        InsNode(R, 'N'); // Обработка числа - ключевой символ N
+        Tree* current = R;
+
+        bool isFirstSymbol = true; // Флаг для отслеживания первого символа 
+
+        for (char n: number) { // Проход по строке, каждый символ будет узлом в дереве
+            Tree* newNode = new Tree; // Новый узел для символов
+
+            newNode->Inf = n; // Поле заполняется текущим символом
+            newNode->Left = nullptr;
+            newNode->Right = nullptr; // Изначально у узла нет потомков
+
+            if (isFirstSymbol) { // Проверка на первый символ числа
+                if (current == R) {
+                    current->Left = newNode; // Первый символ присоединяем как левого потомка
+                }
+                else {
+                    cout << "ОШИБКА: Некорректное состояние дерева при обработке числа" << endl;
+                    exit(1);
+                }
+                isFirstSymbol = false; // После обработки первого символа меняем флаг
+            }
+            else {
+                current->Right = newNode; // Если символ не первый, то присоединяем его справа
+            }
+
+            current = newNode; // Переход к новому узлу
+        }
+
+        if (SN != -1 && Scansymbol != '<' && Scansymbol != '>' && Scansymbol != '+' && Scansymbol != '-' && Scansymbol != '*' && Scansymbol != '/' &&
+            Scansymbol != '%' && Scansymbol != '^' && Scansymbol != '&' && Scansymbol != '|' && Scansymbol != '!' && Scansymbol != '=' && Scansymbol != ')') { // Проверяем символы на соответствие алфавиту
+            cout << "ОШИБКА: Недопустимый символ после числа: " << Scansymbol << endl;
+            exit(1);
+        }
+        return;
+    }
+    cout << "ОШИБКА: Неожиданный символ: " << Scansymbol << endl; // Если символ не число
+    exit(1);
+}
+
+void Power(Tree*& R) {
+    Factor(R);
+
+    while (Scansymbol == '^') { // Проверка на наличие возведения в степень
+        char currentOperator = Scansymbol; // Сохраняем символ оператора
+        NEXTSYMBOL(); // Следующий символ
+
+        Tree* tmp = new Tree; // Создание новой вершины
+        tmp->Inf = currentOperator; // Устанавливаем операцию в ключевой символ (символ ^ будет выведен в польской записи)
+        tmp->Left = R; // Левый потомок - предыдущее выражение
+        bool isValidRight = false; // Флаг для проверки правого операнда
+
+        Power(tmp->Right); // Разбор правого операнда
+
+        if (tmp->Right != nullptr) { // Если правый операнд разобран успешно
+            isValidRight = true;
+        }
+        if (!isValidRight) { // Если правого операнда нет - выводим ошибку
+            cout << "ОШИБКА: Отсутствует правый операнд для операции возведения в степень" << endl;
+            exit(1);
+        }
+
+        R = tmp; // Обновляем корень дерева
+    }
+}
+
+void Division(Tree*& R) {
+    Power(R);
+
+    while (true) { // Проверка на операторов деления, умножения или целочисленного деления
+        char currentOperator = '\0'; // Переменная для хранения оператора
+        bool FullDivision = false; // Флаг для целочисленного деления
+
+        if (Scansymbol == '/' && SN + 1 < ExprStr.length() && ExprStr[SN + 1] == '/') { // Проверка на наличие операторов
+            FullDivision = true; // Меняем флаг на то, что это целочисленное деление
+            currentOperator = 'D'; // Ключевой символ для целочисленного деления
+        }
+        else if (Scansymbol == '*' || Scansymbol == '/' || Scansymbol == '%') {
+            currentOperator = Scansymbol; // Сохраняем текущий оператор
+        }
+        else {
+            break; // Если не встретили оператор - выходим из цикла
+        }
+
+        Tree* tmp = new Tree; // Новая вершина
+        tmp->Inf = currentOperator; // Устанавливаем операцию в ключевой символ
+        tmp->Left = R; // Левый потомок - предыдущее выражение
+
+        if (FullDivision) {
+            NEXTSYMBOL(); // Переходим к следующему 
+            NEXTSYMBOL(); // Пропускаем второй символ //
+        }
+        else {
+            NEXTSYMBOL(); // Переходим к следующему символу
+        }
+
+        Power(tmp->Right); // Разбор правого операнда
+
+        R = tmp; // Обновляем корень дерева
+    }
+}
+
+void Addend(Tree*& R) {
+    Division(R);
+
+    while (Scansymbol == '+' || Scansymbol == '-') { // Сложение и вычиатние
+        char currentOperator = Scansymbol; // Сохраняем текущий символ
+        NEXTSYMBOL(); // Переходим к следующему
+
+        bool hasLeftOperand = R; // Проверка на наличие левого операнда для вычитания
+        if (currentOperator == '-' && !hasLeftOperand) {
+            cout << "ОШИБКА: Отсутствует левый операнд для операции вычитания" << endl;
+            exit(1);
+        }
+
+        Tree* tmp = new Tree;
+        tmp->Inf = currentOperator; // Устанавливаем операцию в ключевой символ
+        tmp->Left = R; // Левый потомок - предыдущее слагаемое
+
+        Division(tmp->Right); // Разбор правого операнда
+
+        R = tmp; // Обновляем корень дерева
+    }
+}
+
+void Comparison(Tree*& R) {
+    Addend(R);
+
+    bool hasOperator = false; // Флаг для операторов сравнения
+    while (true) {
+        char currentOp = '\0'; // Переменная для хранения текущего оператора
+        bool fewSymbolsOperator = false; // Флаг для двухсимвольных операторов
+
+        if (Scansymbol == '<') { // Проверка на <, <=, <>
+            currentOp = '<';
+            NEXTSYMBOL(); // Следующий символ
+            if (Scansymbol == '=') { // Если встречаем =, то это <=
+                currentOp = 'L'; // Ключевой символ для <=
+                fewSymbolsOperator = true;
+                NEXTSYMBOL();
+            }
+            else if (Scansymbol == '>') { // Если встречаем >, то это <>
+                currentOp = 'U'; // Ключевой символ для <>
+                fewSymbolsOperator = true;
+                NEXTSYMBOL(); 
+            }
+        }
+        else if (Scansymbol == '>') { // Проверка на > или >=
+            currentOp = '>';
+            NEXTSYMBOL();
+            if (Scansymbol == '=') { // Если встречаем =, то это >=
+                currentOp = 'G'; // Ключевой символ для >=
+                fewSymbolsOperator = true;
+                NEXTSYMBOL();
+            }
+        }
+        else if (Scansymbol == '=') { // Проверка на ==
+            NEXTSYMBOL();
+            if (Scansymbol == '=') { // Если встречаем второй =, то это ==
+                currentOp = 'E'; // Ключевой символ для ==
+                fewSymbolsOperator = true;
+                NEXTSYMBOL();
+            }
+            else {
+                cout << "ОШИБКА: Неверный оператор сравнения '='" << endl;
+                exit(1);
+            }
+        }
+        else {
+            break; // Цикл нужен для сравнения сравнений (например, 34<>5>2). Если не нашли оператор - выходим
+        }
+
+        if (currentOp != '\0') { // Если нашли оператор сравнения
+            hasOperator = true; // Флаг наличия оператора
+            Tree* tmp = new Tree; // Новый узел
+            tmp->Inf = currentOp; // Ключевой символ для оператора
+            tmp->Left = R; // Левый потомок — текущее дерево
+
+            Addend(tmp->Right); // Разбор правой части выражения
+
+            R = tmp; // Обновляем корень дерева
+        }
+    }
+
+    if (!hasOperator) { // Если не было операторов сравнения
+        return; // Просто завершаем функцию
+    }
+}
+
+void LogicalFactor(Tree*& R) {
+    Comparison(R);
+
+    while (Scansymbol == '&') {
+        Tree* tmp = new Tree; 
+        tmp->Inf = '&'; // Ключевой символ для логического И
+        tmp->Left = R; // Левый потомок - текущее дерево
+        NEXTSYMBOL(); 
+
+        LogicalFactor(tmp->Right); // Разбор правой части выражения
+
+        R = tmp; // Обновляем корень дерева
+    }
+}
+
+void LogicalExpression(Tree*& R) {
+if (Scansymbol == '|') {
+        NEXTSYMBOL(); 
+        if (Scansymbol != '|') { // Проверяем, что второй символ тоже |
+            cout << "ОШИБКА: Ожидался оператор '||'" << endl;
+            exit(1);
+        }
+
+        NEXTSYMBOL(); // Переходим к следующему символу после ||
+
+        Tree* tmp = new Tree; // Новый узел
+        tmp->Inf = '|'; 
+        tmp->Left = R; 
+
+        if (Scansymbol == ')') {
+            tmp->Right = nullptr; // Если скобка, то правого потомка нет
+            R = tmp;
+            NEXTSYMBOL(); // Переходим к следующему символу
+            return;
+        }
+
+        LogicalExpression(tmp->Right);
+
+        R = tmp; // Обновляем корень дерева
+    }
+}
+
+int main() {
+    setlocale(LC_ALL, "Rus"); // Нормальная Кириллица
+
+    cout << "Введите выражение: ";
+    string inputExpression;
+    getline(cin, inputExpression); // getline для работы с пробелами
+
+    bool hasSpaces = false; // Проверка на наличие пробелов в выражении
+    for (int i = 0; i < inputExpression.length(); ++i) {
+        if (inputExpression[i] == ' ') {
+            hasSpaces = true;
+            break;
+        }
+    }
+    if (hasSpaces) {
+        cout << "ОШИБКА: Пробелы в выражении не допускаются" << endl;
+        return 1;
+    }
+
+    bool isEmpty = true; // Проверка на пустое выражение
+    for (int i = 0; i < inputExpression.length(); ++i) {
+        if (inputExpression[i] != '\0') {
+            isEmpty = false;
+            break;
+        }
+    }
+    if (isEmpty) {
+        cout << "ОШИБКА: Пустое выражение" << endl;
+        return 1;
+    }
+
+    SN = 0; // Глобальные переменные
+    ExprStr = inputExpression;
+    Scansymbol = ExprStr[SN];
+
+    Tree* root = nullptr;
+    LogicalExpression(root);
+
+    if (SN != -1) { // Проверка на наличие лишних символов в конце строки
+        cout << "ОШИБКА: Непредвиденные символы в конце выражения" << endl;
+        exit(1);
+    }
+
+    cout << "Обратная польская запись:" << endl; // Вывод обратной польской запис
+    WriteExpr(root);
+    cout << endl;
+
+    return 0;
+}
